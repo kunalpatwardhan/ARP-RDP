@@ -5,7 +5,9 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,9 +30,9 @@ namespace WindowsFormsApp3
         {
             List<string> ip_range = new List<string>();
             string split_ip;
-            split_ip = listBox1.Text.Split(' ')[1];
+            split_ip = arp_ip_text.Split(' ')[1];
             split_ip = split_ip.Split('.')[0] + '.' + split_ip.Split('.')[1] + '.' + split_ip.Split('.')[2];
-            listBox2.Items.Clear();
+            list2clear();
             foreach (string str in arp_output)
             {
                 if (str.Contains(split_ip) && (!str.Contains("Interface")))
@@ -45,19 +47,19 @@ namespace WindowsFormsApp3
             }
             return ip_range.ToArray();
         }
+
+
+        bool listbox_index_changed = false;
+        string arp_ip_text;
         private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            listBox2.Items.AddRange( get_arp_ip_interfce(listBox1.Text));
+            listbox_index_changed = true;
+            arp_ip_text = listBox1.Text;
             //listBox2.Items.Add(split_ip);
         }
-
+     
         private void listBox2_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (!listBox2.Text.Contains("Port closed"))
-                Process.Start("mstsc", "/v:" + listBox2.Text);
-
-
-                  
             
 
         }
@@ -89,7 +91,23 @@ namespace WindowsFormsApp3
                 listBox1.Items.Clear();
             }
         }
+        delegate void list2clearCallback();
 
+        private void list2clear()
+        {
+            // InvokeRequired required compares the thread ID of the
+            // calling thread to the thread ID of the creating thread.
+            // If these threads are different, it returns true.
+            if (listBox2.InvokeRequired)
+            {
+                list2clearCallback d = new list2clearCallback(list2clear);
+                this.Invoke(d, new object[] { });
+            }
+            else
+            {
+                listBox2.Items.Clear();
+            }
+        }
         delegate void list1addCallback(string item);
 
         private void list1add(string item)
@@ -121,9 +139,34 @@ namespace WindowsFormsApp3
             }
             else
             {
-                listBox2.Items[index] = item;
+                try
+                {
+                    listBox2.Items[index] = item;
+                }
+                catch
+                {
+                }
             }
         }
+
+        delegate void list2addRangeCallback(string[] item);
+
+        private void list2addrange(string[] item)
+        {
+            // InvokeRequired required compares the thread ID of the
+            // calling thread to the thread ID of the creating thread.
+            // If these threads are different, it returns true.
+            if (listBox2.InvokeRequired)
+            {
+                list2addRangeCallback d = new list2addRangeCallback(list2addrange);
+                this.Invoke(d, new object[] { item });
+            }
+            else
+            {
+                listBox2.Items.AddRange(item);
+            }
+        }
+
         private void OnCallBack()
         {
             timer.Dispose();
@@ -144,20 +187,60 @@ namespace WindowsFormsApp3
             string output2 = p.StandardOutput.ReadToEnd();
             if (output == output2)
             {
-
+                if (listbox_index_changed)
+                {
+                    list2addrange(get_arp_ip_interfce(arp_ip_text));
+                    listbox_index_changed = false;
+                }
                 using (TcpClient tcpClient = new TcpClient())
                 {
                     for (int i = 0; i < listBox2.Items.Count; i++)
                     {
+
+                        string str_ip = listBox2.Items[i].ToString().Split('-')[0].Trim();
+
+                        if (!listBox2.Items[i].ToString().Contains("-"))
+                        {
+                            list2add(i, str_ip + " -   Querying");
+                        }
                         try
                         {
+                           
                             if (!listBox2.Items[i].ToString().Contains("Port closed"))
-                                tcpClient.Connect(listBox2.Items[i].ToString(), 3389);
+                                tcpClient.Connect(str_ip, 3389);
+
+                            var times = new List<double>();
+                            //for (int j = 0; j < 4; j++)
+                           // {
+                                var sock = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                                sock.Blocking = true;
+
+                                var stopwatch = new Stopwatch();
+                             
+                                IPAddress ip = IPAddress.Parse(str_ip);// Dns.GetHostEntry(listBox2.Text).AddressList[0]; 
+                                int port = 3389;
+
+                                // Measure the Connect call only
+                                stopwatch.Start();
+
+                                sock.Connect(ip, port);
+                                stopwatch.Stop();
+
+                                double t = stopwatch.Elapsed.TotalMilliseconds;
+                              //  Console.WriteLine("{0:0.00}ms", t);
+                               // times.Add(t);
+
+                                sock.Close();
+
+                         //       Thread.Sleep(1000);
+                            //}
+                            list2add(i ,str_ip + " -   time = " +  (int)t + " ms");
+                         //   Console.WriteLine("{0:0.00} {1:0.00} {2:0.00}", times.Min(), times.Max(), times.Average());
                             //Process.Start("mstsc", "/v:" + listBox2.Text);
                         }
                         catch (Exception)
                         {
-                            list2add(listBox2.Items.IndexOf(listBox2.Items[i].ToString()) , listBox2.Items[i].ToString() + " - Port closed");
+                            list2add(i, str_ip + " -   Port closed");
                         }
                     }
                 }
@@ -176,6 +259,26 @@ namespace WindowsFormsApp3
 
             p.WaitForExit();
             timer = new System.Threading.Timer(_ => OnCallBack(), null, 1000 * 1, Timeout.Infinite); //in 10 seconds
+        }
+
+        private void listBox2_Click(object sender, EventArgs e)
+        {
+            if (!listBox2.Text.Contains("Port closed"))
+            {
+                Process p = new Process();
+                string str_ip = listBox2.Text.Split('-')[0].Trim();
+                // Redirect the output stream of the child process.
+                p.StartInfo.UseShellExecute = false;
+                p.StartInfo.RedirectStandardOutput = true;
+                p.StartInfo.FileName = "mstsc";
+                p.StartInfo.Arguments = "/v:" + str_ip;
+                //p.StartInfo.CreateNoWindow = true;
+                p.Start();
+                // Process.Start("mstsc", "/v:" + listBox2.Text);
+
+
+            }
+
         }
     }
 
