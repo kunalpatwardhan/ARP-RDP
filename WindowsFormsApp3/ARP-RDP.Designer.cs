@@ -71,6 +71,7 @@ namespace WindowsFormsApp3
             this.Name = "Form1";
             this.ShowIcon = false;
             this.Text = "ARP-RDP";
+            this.Load += new System.EventHandler(this.Form1_Load);
             this.ResumeLayout(false);
 
         }
