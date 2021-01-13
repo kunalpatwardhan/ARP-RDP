@@ -257,6 +257,15 @@ namespace WindowsFormsApp3
                     list1add(str);
             }
 
+            //System.Diagnostics.Process.Start("route", "-f");
+            //System.Diagnostics.Process.Start("ipconfig", "/release");
+            //System.Diagnostics.Process.Start("ipconfig", "/renew");
+            //System.Diagnostics.Process.Start("arp", "-d *");
+            //System.Diagnostics.Process.Start("netsh", "interface ip delete arpcache");
+            //System.Diagnostics.Process.Start(@"c:\windows\sysnative\nbtstat.exe", "-R");
+            //System.Diagnostics.Process.Start(@"c:\windows\sysnative\nbtstat.exe", "-RR");
+            //System.Diagnostics.Process.Start("ipconfig", "/flushdns");
+            //System.Diagnostics.Process.Start("ipconfig", "/registerdns");
             p.WaitForExit();
             timer = new System.Threading.Timer(_ => OnCallBack(), null, 1000 * 1, Timeout.Infinite); //in 10 seconds
         }
